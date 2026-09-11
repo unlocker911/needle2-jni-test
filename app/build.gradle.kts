@@ -1,5 +1,4 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import java.lang.JavaVersion
+import org.gradle.api.JavaVersion
 
 plugins {
     id("com.android.application")
