@@ -4,11 +4,11 @@ import android.content.Context
 import android.os.Bundle
 import android.util.Log
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
+import android.app.Activity
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : Activity() {
 
     private val TAG = "Needle2Test"
     private lateinit var textView: TextView
