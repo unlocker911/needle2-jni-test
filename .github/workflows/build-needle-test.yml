@@ -1,0 +1,79 @@
+name: Build Needle 2 JNI Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+      with:
+        api-level: 35
+        ndk-version: r26b
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x ./gradlew
+
+    - name: Build Debug APK
+      run: ./gradlew :app:assembleDebug
+
+    - name: Verify libneedle2jni.so
+      run: |
+        echo "=== Native library verification ==="
+        find . -name "libneedle2jni.so" -type f | while read lib; do
+          echo "Found: $lib"
+          file "$lib"
+          readelf -h "$lib" | grep -E "Class|Machine|ABI"
+          readelf -d "$lib" | grep NEEDED
+          nm -D "$lib" | grep -E "Java_com_example_needle_NeedleJNI"
+          echo "Size: $(stat -c%s "$lib") bytes"
+        done
+
+    - name: Verify no unresolved Needle symbols
+      run: |
+        echo "=== Checking for unresolved symbols ==="
+        find . -name "libneedle2jni.so" -type f | while read lib; do
+          echo "Checking $lib for unresolved symbols..."
+          nm -D "$lib" | grep " U " | grep -v -E "(libc|libm|libdl|liblog|libc\+\+|libandroid)" || echo "No unexpected unresolved symbols"
+        done
+
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: needle2-test-apk
+        path: app/build/outputs/apk/debug/app-debug.apk
+
+    - name: Upload Native Library
+      uses: actions/upload-artifact@v4
+      with:
+        name: libneedle2jni-so
+        path: |
+          **/libneedle2jni.so
+
+    - name: Print APK info
+      run: |
+        APK_PATH=$(find . -name "app-debug.apk" | head -1)
+        if [ -f "$APK_PATH" ]; then
+          echo "APK built successfully: $APK_PATH"
+          echo "Size: $(stat -c%s "$APK_PATH") bytes"
+        else
+          echo "ERROR: APK not found"
+          exit 1
+        fi
