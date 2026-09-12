@@ -9,7 +9,10 @@ import android.view.View
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,18 +22,23 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.inputService
+import androidx.compose.foundation.layout.verticalScroll
+import androidx.compose.foundation.layout.minHeight
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.Copy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
@@ -39,13 +47,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -66,6 +74,7 @@ import kotlin.math.min
 import kotlin.math.max
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.compose.ui.tooling.preview.Preview
 
 // Data Classes
 sealed interface TestStatus {
@@ -112,7 +121,8 @@ data class NeedleResponse(
     val confidence: Float = 0f,
     val prefill_tps: Float = 0f,
     val decode_tps: Float = 0f,
-    val peak_ram_mb: Int = 0
+    val peak_ram_mb: Int = 0,
+    val rawJson: String = ""
 )
 
 data class FunctionCall(
@@ -286,7 +296,7 @@ class NeedleTestViewModel : ViewModel() {
                 var bytesRead = inputStream.read(data)
                 while (bytesRead != -1) {
                     buffer.write(data, 0, bytesRead)
-                    bytesRead = buffer.read(data)
+                    bytesRead = inputStream.read(data)
                 }
                 inputStream.close()
                 val bytes = buffer.toByteArray()
@@ -610,10 +620,6 @@ class NeedleTestViewModel : ViewModel() {
         _history.value = emptyList()
     }
 
-    fun clearLog() {
-        _fullLog.value = StringBuilder()
-    }
-
     fun exportResults(): String {
         val export = StringBuilder()
         export.append("Needle 2 Test Results Export\n")
@@ -878,7 +884,7 @@ fun ActionButtonsSection(viewModel: NeedleTestViewModel, isRunning: Boolean) {
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null, size = 20.dp)
+                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Run All", fontWeight = FontWeight.Bold)
                 }
@@ -896,7 +902,7 @@ fun ActionButtonsSection(viewModel: NeedleTestViewModel, isRunning: Boolean) {
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Refresh, contentDescription = null, size = 20.dp)
+                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Reset Needle")
                 }
@@ -919,7 +925,7 @@ fun ActionButtonsSection(viewModel: NeedleTestViewModel, isRunning: Boolean) {
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Delete, contentDescription = null, size = 20.dp)
+                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Clear Results")
                 }
@@ -1118,7 +1124,7 @@ fun ResultSection(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             IconButton(onClick = onCopy) {
-                Icon(Icons.Default.Copy, contentDescription = "Copy $title", tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 20.dp)
+                Icon(Icons.Default.Copy, contentDescription = "Copy $title", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
             }
         }
         Text(
@@ -1205,7 +1211,7 @@ fun ResultTabs(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Copy, contentDescription = null, size = 16.dp)
+                    Icon(Icons.Default.Copy, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Copy All", fontSize = 12.sp)
                 }
@@ -1215,7 +1221,7 @@ fun ResultTabs(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Share, contentDescription = null, size = 16.dp)
+                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Share", fontSize = 12.sp)
                 }
@@ -1233,7 +1239,7 @@ fun SelectableText(text: String, onCopy: () -> Unit) {
             val textView = android.widget.TextView(ctx).apply {
                 this.text = text
                 textSize = 12f
-                setTextColor(androidx.compose.ui.graphics.Color.Companion.getValue(MaterialTheme.colorScheme.onSurface))
+                setTextColor(MaterialTheme.colorScheme.onSurface.toArgb())
                 movementMethod = android.text.method.ScrollingMovementMethod()
                 isTextSelectable = true
                 setPadding(0, 0, 0, 0)
@@ -1258,7 +1264,7 @@ fun PerformanceMetricsSection(phases: List<TestPhase>) {
     if (completedPhases.isEmpty()) return
 
     val totalTime = completedPhases.sumOf { it.inferenceTimeMs }
-    val avgConfidence = if (completedPhases.isNotEmpty()) completedPhases.averageOf { it.confidence } else 0f
+    val avgConfidence = if (completedPhases.isNotEmpty()) completedPhases.map { it.confidence }.average() else 0f
     val passCount = completedPhases.count { it.status is TestStatus.Pass }
     val failCount = completedPhases.count { it.status is TestStatus.Fail }
 
@@ -1276,20 +1282,24 @@ fun PerformanceMetricsSection(phases: List<TestPhase>) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                MetricCard("Total Time", "${totalTime} ms", Icons.Default.Timer)
-                MetricCard("Avg Confidence", "${(avgConfidence * 100).toInt()}%", Icons.Default.Psychology)
-                MetricCard("Passed", "$passCount", Icons.Default.CheckCircle)
-                MetricCard("Failed", "$failCount", Icons.Default.Cancel)
+                MetricCard("Total Time", "${totalTime} ms", Icons.Filled.Timer, modifier = Modifier.weight(1f))
+                MetricCard("Avg Confidence", "${(avgConfidence * 100).toInt()}%", Icons.Filled.Psychology, modifier = Modifier.weight(1f))
+                MetricCard("Passed", "$passCount", Icons.Filled.CheckCircle, modifier = Modifier.weight(1f))
+                MetricCard("Failed", "$failCount", Icons.Filled.Cancel, modifier = Modifier.weight(1f))
             }
         }
     }
 }
 
 @Composable
-fun MetricCard(title: String, value: String, icon: androidx.compose.material.icons.filled.Icon) {
+fun MetricCard(
+    title: String,
+    value: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier = Modifier
+) {
     Box(
-        modifier = Modifier
-            .weight(1f)
+        modifier = modifier
             .padding(12.dp)
             .background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(8.dp)),
         contentAlignment = Alignment.Center
@@ -1298,7 +1308,7 @@ fun MetricCard(title: String, value: String, icon: androidx.compose.material.ico
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, size = 24.dp)
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
             Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             Text(title, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -1700,4 +1710,23 @@ private fun copyToClipboard(context: Context, text: String) {
     val clip = android.content.ClipData.newPlainText("Needle2Test", text)
     clipboard.primaryClip = clip
     android.widget.Toast.makeText(context, "Copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
+}
+
+class MainActivity : ComponentActivity() {
+    private val viewModel: NeedleTestViewModel by viewModels()
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContent {
+            MaterialTheme {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.surface
+                ) {
+                    MainScreen(viewModel)
+                }
+            }
+        }
+    }
 }
