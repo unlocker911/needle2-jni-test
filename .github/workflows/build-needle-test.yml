@@ -91,12 +91,12 @@ jobs:
           exit 1
         fi
 
-- name: Verify APK contents
-  run: |
-    APK_PATH=$(find . -name "app-debug.apk" | head -1)
-    echo "=== APK Contents (lib/arm64-v8a/) ==="
-    unzip -l "$APK_PATH" | grep "lib/arm64-v8a/" || echo "No arm64-v8a libs found"
-    echo ""
-    echo "=== Explicit check for required files ==="
-    unzip -l "$APK_PATH" | grep "libneedle2jni.so" && echo "✅ libneedle2jni.so FOUND" || echo "❌ libneedle2jni.so MISSING"
-    unzip -l "$APK_PATH" | grep "libc++_shared.so" && echo "✅ libc++_shared.so FOUND" || echo "❌ libc++_shared.so MISSING"
+    - name: Verify APK contents
+      run: |
+        APK_PATH=$(find . -name "app-debug.apk" | head -1)
+        echo "=== APK Contents (lib/arm64-v8a/) ==="
+        unzip -l "$APK_PATH" | grep "lib/arm64-v8a/" || echo "No arm64-v8a libs found"
+        echo ""
+        echo "=== Explicit check for required files ==="
+        unzip -l "$APK_PATH" | grep "libneedle2jni.so" && echo "✅ libneedle2jni.so FOUND" || echo "❌ libneedle2jni.so MISSING"
+        unzip -l "$APK_PATH" | grep "libc++_shared.so" && echo "✅ libc++_shared.so FOUND" || echo "❌ libc++_shared.so MISSING"
