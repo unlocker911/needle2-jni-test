@@ -27,10 +27,9 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
 
-- name: Copy libc++_shared.so from NDK to jniLibs
+    - name: Copy libc++_shared.so from NDK to jniLibs
       run: |
         echo "Looking for libc++_shared.so in NDK installation..."
-        # Find NDK installation (setup-android installs NDK here)
         NDK_PATH=$(find /usr/local/lib/android/sdk/ndk -maxdepth 1 -type d | grep -v "^/usr/local/lib/android/sdk/ndk$" | head -1)
         if [ -z "$NDK_PATH" ]; then
           echo "ERROR: NDK installation not found"
