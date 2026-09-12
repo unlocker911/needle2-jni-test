@@ -1,0 +1,27 @@
+# Gradle
+.gradle/
+build/
+
+# Local configuration
+local.properties
+
+# Build outputs
+*.apk
+*.aab
+
+# Keystores
+*.keystore
+*.jks
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local reports
+reports/
