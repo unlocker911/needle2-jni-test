@@ -27,6 +27,20 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
 
+    - name: Copy libc++_shared.so from NDK to jniLibs
+      run: |
+        NDK_PATH="/usr/local/lib/android/sdk/ndk/26.1.10909125"
+        CPP_SHARED="${NDK_PATH}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"
+        if [ -f "$CPP_SHARED" ]; then
+          cp "$CPP_SHARED" app/src/main/jniLibs/arm64-v8a/libc++_shared.so
+          echo "Copied libc++_shared.so to jniLibs"
+          ls -la app/src/main/jniLibs/arm64-v8a/
+        else
+          echo "ERROR: libc++_shared.so not found at $CPP_SHARED"
+          find "$NDK_PATH" -name "libc++_shared.so" 2>/dev/null || echo "Not found anywhere in NDK"
+          exit 1
+        fi
+
     - name: Grant execute permission for gradlew
       run: chmod +x ./gradlew
 
@@ -76,3 +90,13 @@ jobs:
           echo "ERROR: APK not found"
           exit 1
         fi
+
+- name: Verify APK contents
+  run: |
+    APK_PATH=$(find . -name "app-debug.apk" | head -1)
+    echo "=== APK Contents (lib/arm64-v8a/) ==="
+    unzip -l "$APK_PATH" | grep "lib/arm64-v8a/" || echo "No arm64-v8a libs found"
+    echo ""
+    echo "=== Explicit check for required files ==="
+    unzip -l "$APK_PATH" | grep "libneedle2jni.so" && echo "✅ libneedle2jni.so FOUND" || echo "❌ libneedle2jni.so MISSING"
+    unzip -l "$APK_PATH" | grep "libc++_shared.so" && echo "✅ libc++_shared.so FOUND" || echo "❌ libc++_shared.so MISSING"
