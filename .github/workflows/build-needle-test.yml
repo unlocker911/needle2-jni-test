@@ -27,23 +27,25 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
 
-    - name: Copy libc++_shared.so from Gradle NDK cache to jniLibs
+- name: Copy libc++_shared.so from NDK to jniLibs
       run: |
-        echo "Looking for libc++_shared.so in Gradle NDK cache..."
-        GRADLE_NDK_CACHE="$HOME/.gradle/caches/ndk"
-        echo "Checking Gradle NDK cache: $GRADLE_NDK_CACHE"
-        ls -la "$GRADLE_NDK_CACHE" 2>/dev/null || echo "Gradle NDK cache not found"
-        CPP_SHARED=$(find "$GRADLE_NDK_CACHE" -name "libc++_shared.so" -path "*aarch64*" 2>/dev/null | head -1)
-        if [ -n "$CPP_SHARED" ] && [ -f "$CPP_SHARED" ]; then
+        echo "Looking for libc++_shared.so in NDK installation..."
+        # Find NDK installation (setup-android installs NDK here)
+        NDK_PATH=$(find /usr/local/lib/android/sdk/ndk -maxdepth 1 -type d | grep -v "^/usr/local/lib/android/sdk/ndk$" | head -1)
+        if [ -z "$NDK_PATH" ]; then
+          echo "ERROR: NDK installation not found"
+          exit 1
+        fi
+        echo "Found NDK at: $NDK_PATH"
+        CPP_SHARED="${NDK_PATH}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"
+        if [ -f "$CPP_SHARED" ]; then
           cp "$CPP_SHARED" app/src/main/jniLibs/arm64-v8a/libc++_shared.so
           echo "Copied libc++_shared.so to jniLibs from $CPP_SHARED"
           ls -la app/src/main/jniLibs/arm64-v8a/
         else
-          echo "ERROR: libc++_shared.so not found in Gradle NDK cache"
-          echo "Searching all Gradle caches for libc++_shared.so..."
-          find "$HOME/.gradle/caches" -name "libc++_shared.so" 2>/dev/null || echo "Not found anywhere in Gradle cache"
-          echo "Checking NDK installation..."
-          find /usr/local/lib/android/sdk/ndk -name "libc++_shared.so" 2>/dev/null || echo "Not found in NDK installation"
+          echo "ERROR: libc++_shared.so not found at expected path: $CPP_SHARED"
+          echo "Searching NDK for libc++_shared.so..."
+          find "$NDK_PATH" -name "libc++_shared.so" 2>/dev/null || echo "Not found in NDK"
           exit 1
         fi
 
