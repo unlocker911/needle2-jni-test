@@ -22,25 +22,23 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       with:
-        api-level: 35
-        ndk-version: r26b
         packages: platform-tools
 
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
 
-    - name: Copy libc++_shared.so from NDK to jniLibs
+    - name: Copy libc++_shared.so from Gradle NDK cache to jniLibs
       run: |
-        NDK_PATH="/usr/local/lib/android/sdk/ndk/26.1.10909125"
-        echo "Looking for libc++_shared.so in NDK..."
-        find "$NDK_PATH" -name "libc++_shared.so" 2>/dev/null
-        CPP_SHARED=$(find "$NDK_PATH" -name "libc++_shared.so" 2>/dev/null | head -1)
+        echo "Looking for libc++_shared.so in Gradle NDK cache..."
+        GRADLE_NDK_CACHE="$HOME/.gradle/caches/ndk"
+        CPP_SHARED=$(find "$GRADLE_NDK_CACHE" -name "libc++_shared.so" -path "*aarch64*" 2>/dev/null | head -1)
         if [ -n "$CPP_SHARED" ] && [ -f "$CPP_SHARED" ]; then
           cp "$CPP_SHARED" app/src/main/jniLibs/arm64-v8a/libc++_shared.so
           echo "Copied libc++_shared.so to jniLibs from $CPP_SHARED"
           ls -la app/src/main/jniLibs/arm64-v8a/
         else
-          echo "ERROR: libc++_shared.so not found in NDK"
+          echo "ERROR: libc++_shared.so not found in Gradle NDK cache"
+          find "$HOME/.gradle/caches" -name "libc++_shared.so" 2>/dev/null || echo "Not found anywhere in Gradle cache"
           exit 1
         fi
 
