@@ -31,6 +31,8 @@ jobs:
       run: |
         echo "Looking for libc++_shared.so in Gradle NDK cache..."
         GRADLE_NDK_CACHE="$HOME/.gradle/caches/ndk"
+        echo "Checking Gradle NDK cache: $GRADLE_NDK_CACHE"
+        ls -la "$GRADLE_NDK_CACHE" 2>/dev/null || echo "Gradle NDK cache not found"
         CPP_SHARED=$(find "$GRADLE_NDK_CACHE" -name "libc++_shared.so" -path "*aarch64*" 2>/dev/null | head -1)
         if [ -n "$CPP_SHARED" ] && [ -f "$CPP_SHARED" ]; then
           cp "$CPP_SHARED" app/src/main/jniLibs/arm64-v8a/libc++_shared.so
@@ -38,7 +40,10 @@ jobs:
           ls -la app/src/main/jniLibs/arm64-v8a/
         else
           echo "ERROR: libc++_shared.so not found in Gradle NDK cache"
+          echo "Searching all Gradle caches for libc++_shared.so..."
           find "$HOME/.gradle/caches" -name "libc++_shared.so" 2>/dev/null || echo "Not found anywhere in Gradle cache"
+          echo "Checking NDK installation..."
+          find /usr/local/lib/android/sdk/ndk -name "libc++_shared.so" 2>/dev/null || echo "Not found in NDK installation"
           exit 1
         fi
 
