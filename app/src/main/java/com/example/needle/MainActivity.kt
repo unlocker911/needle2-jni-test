@@ -1296,7 +1296,7 @@ fun PerformanceMetricsSection(phases: List<TestPhase>) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 MetricCard("Total Time", "${totalTime} ms", Timer, modifier = Modifier.weight(1f))
-                MetricCard("Avg Confidence", "${(avgConfidence * 100.0).toInt()}%", Psychology, modifier = Modifier.weight(1f))
+                MetricCard("Avg Confidence", "${(avgConfidence * 100.0f).toInt()}%", Psychology, modifier = Modifier.weight(1f))
                 MetricCard("Passed", "$passCount", CheckCircle, modifier = Modifier.weight(1f))
                 MetricCard("Failed", "$failCount", Cancel, modifier = Modifier.weight(1f))
             }
