@@ -17,7 +17,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.verticalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -26,7 +26,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Cancel
-import androidx.compose.material.icons.filled.Copy
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandMore
@@ -40,7 +40,19 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.TextField
+import androidx.compose.material3.Divider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -716,8 +728,8 @@ class NeedleTestViewModel : ViewModel() {
                 description = "Turn on the phone flashlight.",
                 parameters = mapOf<String, Any>(
                     "type" to "object",
-                    "properties" to emptyMap(),
-                    "required" to emptyList()
+                    "properties" to emptyMap<String, Any>(),
+                    "required" to emptyList<String>()
                 )
             )
         )
@@ -1124,7 +1136,7 @@ fun ResultSection(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             IconButton(onClick = onCopy) {
-                Icon(Icons.Default.Copy, contentDescription = "Copy $title", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                Icon(Icons.Default.ContentCopy, contentDescription = "Copy $title", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
             }
         }
         Text(
@@ -1211,7 +1223,7 @@ fun ResultTabs(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Copy, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Copy All", fontSize = 12.sp)
                 }
@@ -1233,14 +1245,15 @@ fun ResultTabs(
 @Composable
 fun SelectableText(text: String, onCopy: () -> Unit) {
     val context = LocalContext.current
+    val textColor = MaterialTheme.colorScheme.onSurface.toArgb()
     AndroidView(
         modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp),
         factory = { ctx ->
             val textView = android.widget.TextView(ctx).apply {
                 this.text = text
                 textSize = 12f
-                setTextColor(MaterialTheme.colorScheme.onSurface.toArgb())
-                movementMethod = android.text.method.ScrollingMovementMethod()
+                setTextColor(textColor)
+                setMovementMethod(android.text.method.ScrollingMovementMethod())
                 isTextSelectable = true
                 setPadding(0, 0, 0, 0)
                 typeface = android.graphics.Typeface.MONOSPACE
@@ -1384,11 +1397,7 @@ fun CustomCommandScreen(viewModel: NeedleTestViewModel) {
                     label = { Text("e.g., turn on the flashlight") },
                     minLines = 3,
                     maxLines = 5,
-                    keyboardOptions = KeyboardOptions.Default,
-                    colors = TextFieldDefaults.colors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest
-                    )
+                    keyboardOptions = KeyboardOptions.Default
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(
@@ -1518,7 +1527,7 @@ fun ToolsScreen(viewModel: NeedleTestViewModel) {
                 ) {
                     Text("Tool JSON (sent to Needle)", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                     IconButton(onClick = { copyToClipboard(context, viewModel.toolJson) }) {
-                        Icon(Icons.Default.Copy, contentDescription = "Copy Tool JSON", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy Tool JSON", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
@@ -1709,7 +1718,7 @@ fun PreviewMainScreen() {
 private fun copyToClipboard(context: Context, text: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
     val clip = android.content.ClipData.newPlainText("Needle2Test", text)
-    clipboard.primaryClip = clip
+    clipboard.setPrimaryClip(clip)
     android.widget.Toast.makeText(context, "Copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
 }
 
