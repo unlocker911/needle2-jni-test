@@ -1278,7 +1278,7 @@ fun PerformanceMetricsSection(phases: List<TestPhase>) {
     if (completedPhases.isEmpty()) return
 
     val totalTime = completedPhases.sumOf { it.inferenceTimeMs }
-    val avgConfidence = if (completedPhases.isNotEmpty()) completedPhases.map { it.confidence }.average() else 0f
+    val avgConfidence: Float = if (completedPhases.isNotEmpty()) completedPhases.map { it.confidence }.average() else 0f
     val passCount = completedPhases.count { it.status is TestStatus.Pass }
     val failCount = completedPhases.count { it.status is TestStatus.Fail }
 
