@@ -75,6 +75,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import com.google.gson.Gson
+import com.google.gson.annotations.SerializedName
+import com.google.gson.reflect.TypeToken
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.text.SimpleDateFormat
@@ -125,22 +127,33 @@ data class TestHistoryEntry(
 )
 
 data class NeedleResponse(
-    val `type`: String = "",
-    val success: Boolean = false,
-    val error: String = "",
-    val error_code: String = "",
-    val function_calls: List<FunctionCall> = emptyList(),
-    val reasoning: String = "",
-    val confidence: Float = 0f,
-    val prefill_tps: Float = 0f,
-    val decode_tps: Float = 0f,
-    val peak_ram_mb: Int = 0,
+    @SerializedName("type") val type: String = "",
+    @SerializedName("success") val success: Boolean = false,
+    @SerializedName("error") val error: String? = null,
+    @SerializedName("error_code") val errorCode: String? = null,
+    @SerializedName("function_calls") val functionCalls: List<FunctionCall> = emptyList(),
+    @SerializedName("reason") val reason: String? = null,
+    @SerializedName("reasoning") val reasoning: String = "",
+    @SerializedName("confidence") val confidence: Float = 0f,
+    @SerializedName("prefill_tps") val prefillTps: Float = 0f,
+    @SerializedName("decode_tps") val decodeTps: Float = 0f,
+    @SerializedName("peak_ram_mb") val peakRamMb: Int = 0,
+    @SerializedName("validation") val validation: Validation? = null,
     val rawJson: String = ""
-)
+) {
+    // Backward compatibility: use reason if reasoning is empty
+    val effectiveReasoning: String
+        get() = if (reasoning.isNotBlank()) reasoning else (reason ?: "")
+}
 
 data class FunctionCall(
-    val name: String = "",
-    val arguments: Map<String, Any> = emptyMap()
+    @SerializedName("name") val name: String = "",
+    @SerializedName("arguments") val arguments: Map<String, Any?> = emptyMap()
+)
+
+data class Validation(
+    @SerializedName("ungrounded") val ungrounded: List<String> = emptyList(),
+    @SerializedName("negation") val negation: Boolean = false
 )
 
 data class ToolSchema(
@@ -398,7 +411,7 @@ class NeedleTestViewModel : ViewModel() {
         phase.parsedResult = formatParsedResult(parsed)
         phase.confidence = parsed.confidence
 
-        if (parsed.function_calls.any { it.name == "device.flashlight_on" }) {
+        if (parsed.functionCalls.any { it.name == "device.flashlight_on" }) {
             phase.status = TestStatus.Pass("Tool call detected: device.flashlight_on")
             phase.confidence = max(phase.confidence, 0.9f)
         } else if (result.contains("device.flashlight_on") || result.contains("flashlight_on")) {
@@ -434,8 +447,8 @@ class NeedleTestViewModel : ViewModel() {
         phase.parsedResult = formatParsedResult(parsed)
         phase.confidence = parsed.confidence
 
-        val hasToolCall = parsed.function_calls.isNotEmpty()
-        if (!hasToolCall || parsed.function_calls.none { it.name == "device.flashlight_on" }) {
+        val hasToolCall = parsed.functionCalls.isNotEmpty()
+        if (!hasToolCall || parsed.functionCalls.none { it.name == "device.flashlight_on" }) {
             phase.status = TestStatus.Pass("No tool call (correctly declined)")
         } else {
             phase.status = TestStatus.Fail(-1, "Incorrectly triggered tool call", result)
@@ -481,7 +494,7 @@ class NeedleTestViewModel : ViewModel() {
             }
             phase.output += "\nAfter reset - Input: turn on the flashlight\nRaw Output:\n$result"
             val parsed = parseNeedleResponse(result)
-            val hasCall = parsed.function_calls.any { it.name == "device.flashlight_on" }
+            val hasCall = parsed.functionCalls.any { it.name == "device.flashlight_on" }
             if (hasCall) {
                 phase.output += "\n✓ Tool call works after reset"
             }
@@ -513,10 +526,10 @@ class NeedleTestViewModel : ViewModel() {
                 NeedleJNI.complete(cmd, 512)
             }
             val parsed = parseNeedleResponse(result)
-            val hasFlashlight = parsed.function_calls.any { it.name == "device.flashlight_on" }
+            val hasFlashlight = parsed.functionCalls.any { it.name == "device.flashlight_on" }
             val expected = cmd.contains("flashlight", ignoreCase = true)
-            val passed = (expected && parsed.function_calls.any { it.name == "device.flashlight_on" }) ||
-                         (!expected && parsed.function_calls.isEmpty())
+            val passed = (expected && parsed.functionCalls.any { it.name == "device.flashlight_on" }) ||
+                         (!expected && parsed.functionCalls.isEmpty())
             allPassed = allPassed && passed
             results.add("Cmd: $cmd\nExpected flashlight: $expected\nGot flashlight: $hasFlashlight\nPassed: $passed\nOutput: $result\n")
         }
@@ -690,21 +703,24 @@ class NeedleTestViewModel : ViewModel() {
         val sb = StringBuilder()
         sb.append("Type: ${response.type}\n")
         sb.append("Success: ${response.success}\n")
-        if (response.error.isNotBlank()) sb.append("Error: ${response.error}\n")
-        if (response.error_code.isNotBlank()) sb.append("Error Code: ${response.error_code}\n")
-        if (response.function_calls.isNotEmpty()) {
+        if (response.error != null && response.error.isNotBlank()) sb.append("Error: ${response.error}\n")
+        if (response.errorCode != null && response.errorCode.isNotBlank()) sb.append("Error Code: ${response.errorCode}\n")
+        if (response.functionCalls.isNotEmpty()) {
             sb.append("Function Calls:\n")
-            for (fc in response.function_calls) {
+            for (fc in response.functionCalls) {
                 sb.append("  - ${fc.name}: ${fc.arguments}\n")
             }
         } else {
             sb.append("Function Calls: (none)\n")
         }
-        if (response.reasoning.isNotBlank()) sb.append("Reasoning: ${response.reasoning}\n")
+        if (response.effectiveReasoning.isNotBlank()) sb.append("Reasoning: ${response.effectiveReasoning}\n")
         sb.append("Confidence: ${response.confidence}\n")
-        if (response.prefill_tps > 0) sb.append("Prefill TPS: ${response.prefill_tps}\n")
-        if (response.decode_tps > 0) sb.append("Decode TPS: ${response.decode_tps}\n")
-        if (response.peak_ram_mb > 0) sb.append("Peak RAM: ${response.peak_ram_mb} MB\n")
+        if (response.prefillTps > 0) sb.append("Prefill TPS: ${response.prefillTps}\n")
+        if (response.decodeTps > 0) sb.append("Decode TPS: ${response.decodeTps}\n")
+        if (response.peakRamMb > 0) sb.append("Peak RAM: ${response.peakRamMb} MB\n")
+        if (response.validation != null) {
+            sb.append("Validation: ungrounded=${response.validation!!.ungrounded}, negation=${response.validation!!.negation}\n")
+        }
         return sb.toString()
     }
 
