@@ -23,7 +23,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.ContentCopy
@@ -40,6 +39,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Card
@@ -895,7 +895,7 @@ fun ActionButtonsSection(viewModel: NeedleTestViewModel, isRunning: Boolean) {
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Icon(PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Run All", fontWeight = FontWeight.Bold)
                 }
@@ -913,7 +913,7 @@ fun ActionButtonsSection(viewModel: NeedleTestViewModel, isRunning: Boolean) {
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Icon(Refresh, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Reset Needle")
                 }
@@ -936,7 +936,7 @@ fun ActionButtonsSection(viewModel: NeedleTestViewModel, isRunning: Boolean) {
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Icon(Delete, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Clear Results")
                 }
@@ -1042,7 +1042,7 @@ fun PhaseCard(phase: TestPhase, viewModel: NeedleTestViewModel, isRunning: Boole
                 }
                 IconButton(onClick = { expanded = !expanded }) {
                     Icon(
-                        imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        imageVector = if (expanded) ExpandLess else ExpandMore,
                         contentDescription = if (expanded) "Collapse" else "Expand",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1054,7 +1054,7 @@ fun PhaseCard(phase: TestPhase, viewModel: NeedleTestViewModel, isRunning: Boole
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, bottom = 16.dp),
+                        .padding(start = 16.dp, top = 0.dp, end = 16.dp, bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     // Run individual phase button
@@ -1136,7 +1136,7 @@ fun ResultSection(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             IconButton(onClick = onCopy) {
-                Icon(Icons.Default.ContentCopy, contentDescription = "Copy $title", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                Icon(ContentCopy, contentDescription = "Copy $title", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
             }
         }
         Text(
@@ -1223,7 +1223,7 @@ fun ResultTabs(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Copy All", fontSize = 12.sp)
                 }
@@ -1233,7 +1233,7 @@ fun ResultTabs(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(Share, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Share", fontSize = 12.sp)
                 }
@@ -1295,10 +1295,10 @@ fun PerformanceMetricsSection(phases: List<TestPhase>) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                MetricCard("Total Time", "${totalTime} ms", Icons.Filled.Timer, modifier = Modifier.weight(1f))
-                MetricCard("Avg Confidence", "${(avgConfidence * 100).toInt()}%", Icons.Filled.Psychology, modifier = Modifier.weight(1f))
-                MetricCard("Passed", "$passCount", Icons.Filled.CheckCircle, modifier = Modifier.weight(1f))
-                MetricCard("Failed", "$failCount", Icons.Filled.Cancel, modifier = Modifier.weight(1f))
+                MetricCard("Total Time", "${totalTime} ms", Timer, modifier = Modifier.weight(1f))
+                MetricCard("Avg Confidence", "${(avgConfidence * 100).toInt()}%", Psychology, modifier = Modifier.weight(1f))
+                MetricCard("Passed", "$passCount", CheckCircle, modifier = Modifier.weight(1f))
+                MetricCard("Failed", "$failCount", Cancel, modifier = Modifier.weight(1f))
             }
         }
     }
@@ -1527,7 +1527,7 @@ fun ToolsScreen(viewModel: NeedleTestViewModel) {
                 ) {
                     Text("Tool JSON (sent to Needle)", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                     IconButton(onClick = { copyToClipboard(context, viewModel.toolJson) }) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy Tool JSON", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(ContentCopy, contentDescription = "Copy Tool JSON", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
