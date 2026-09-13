@@ -60,8 +60,17 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x ./gradlew
 
+    - name: Debug - Verify MainActivity.kt content
+      run: |
+        echo "=== Checking MainActivity.kt at key lines ==="
+        sed -n '895,905p' app/src/main/java/com/example/needle/MainActivity.kt
+        echo "---"
+        sed -n '1295,1305p' app/src/main/java/com/example/needle/MainActivity.kt
+        echo "---"
+        sed -n '1250,1265p' app/src/main/java/com/example/needle/MainActivity.kt
+
     - name: Build Debug APK
-      run: ./gradlew :app:assembleDebug
+      run: ./gradlew :app:assembleDebug --no-build-cache
 
     - name: Verify libneedle2jni.so
       run: |
