@@ -1254,7 +1254,7 @@ fun SelectableText(text: String, onCopy: () -> Unit) {
                 textSize = 12f
                 setTextColor(textColor)
                 setMovementMethod(android.text.method.ScrollingMovementMethod())
-                isTextSelectable = true
+                setTextIsSelectable(true)
                 setPadding(0, 0, 0, 0)
                 typeface = android.graphics.Typeface.MONOSPACE
             }
@@ -1296,7 +1296,7 @@ fun PerformanceMetricsSection(phases: List<TestPhase>) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 MetricCard("Total Time", "${totalTime} ms", Timer, modifier = Modifier.weight(1f))
-                MetricCard("Avg Confidence", "${(avgConfidence * 100).toInt()}%", Psychology, modifier = Modifier.weight(1f))
+                MetricCard("Avg Confidence", "${(avgConfidence * 100.0).toInt()}%", Psychology, modifier = Modifier.weight(1f))
                 MetricCard("Passed", "$passCount", CheckCircle, modifier = Modifier.weight(1f))
                 MetricCard("Failed", "$failCount", Cancel, modifier = Modifier.weight(1f))
             }
