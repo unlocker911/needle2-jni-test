@@ -17,13 +17,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.layout.verticalScroll
-import androidx.compose.foundation.layout.minHeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Cancel
@@ -46,6 +45,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -529,16 +529,15 @@ class NeedleTestViewModel : ViewModel() {
         _customCommand.value = input
         viewModelScope.launch {
             _isRunning.value = true
+            val phase = TestPhase(
+                id = 99,
+                title = "Custom Command",
+                description = "Custom command test",
+                input = input
+            )
+            phase.status = TestStatus.Running("Running custom command...")
+            _customResult.value = phase.copy()
             try {
-                val phase = TestPhase(
-                    id = 99,
-                    title = "Custom Command",
-                    description = "Custom command test",
-                    input = input
-                )
-                phase.status = TestStatus.Running("Running custom command...")
-                _customResult.value = phase.copy()
-
                 val startTime = System.currentTimeMillis()
                 val result = withContext(Dispatchers.IO) {
                     NeedleJNI.complete(input, 512)
@@ -715,7 +714,7 @@ class NeedleTestViewModel : ViewModel() {
             ToolSchema(
                 name = "device.flashlight_on",
                 description = "Turn on the phone flashlight.",
-                parameters = mapOf(
+                parameters = mapOf<String, Any>(
                     "type" to "object",
                     "properties" to emptyMap(),
                     "required" to emptyList()
@@ -954,6 +953,7 @@ fun PhaseListSection(phases: List<TestPhase>, viewModel: NeedleTestViewModel, is
 
 @Composable
 fun PhaseCard(phase: TestPhase, viewModel: NeedleTestViewModel, isRunning: Boolean) {
+    val context = LocalContext.current
     var expanded by remember { mutableStateOf(phase.isExpanded) }
     val statusColor = when (phase.status) {
         is TestStatus.Pass -> MaterialTheme.colorScheme.tertiary
@@ -1234,7 +1234,7 @@ fun ResultTabs(
 fun SelectableText(text: String, onCopy: () -> Unit) {
     val context = LocalContext.current
     AndroidView(
-        modifier = Modifier.fillMaxWidth().minHeight(100.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp),
         factory = { ctx ->
             val textView = android.widget.TextView(ctx).apply {
                 this.text = text
@@ -1385,7 +1385,7 @@ fun CustomCommandScreen(viewModel: NeedleTestViewModel) {
                     minLines = 3,
                     maxLines = 5,
                     keyboardOptions = KeyboardOptions.Default,
-                    colors = TextFieldDefaults.textFieldColors(
+                    colors = TextFieldDefaults.colors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                         focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest
                     )
@@ -1473,6 +1473,7 @@ fun CustomCommandScreen(viewModel: NeedleTestViewModel) {
 @Composable
 fun ToolsScreen(viewModel: NeedleTestViewModel) {
     val toolSchemas = viewModel.toolSchemas
+    val context = LocalContext.current
 
     Column(
         modifier = Modifier
@@ -1516,14 +1517,14 @@ fun ToolsScreen(viewModel: NeedleTestViewModel) {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text("Tool JSON (sent to Needle)", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                    IconButton(onClick = { copyToClipboard(LocalContext.current, viewModel.toolJson) }) {
+                    IconButton(onClick = { copyToClipboard(context, viewModel.toolJson) }) {
                         Icon(Icons.Default.Copy, contentDescription = "Copy Tool JSON", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 SelectableText(
                     text = viewModel.toolJson,
-                    onCopy = { copyToClipboard(LocalContext.current, viewModel.toolJson) }
+                    onCopy = { copyToClipboard(context, viewModel.toolJson) }
                 )
             }
         }
