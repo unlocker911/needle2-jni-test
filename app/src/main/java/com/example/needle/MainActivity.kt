@@ -134,16 +134,22 @@ data class NeedleResponse(
     @SerializedName("function_calls") val functionCalls: List<FunctionCall> = emptyList(),
     @SerializedName("reason") val reason: String? = null,
     @SerializedName("reasoning") val reasoning: String = "",
-    @SerializedName("confidence") val confidence: Float = 0f,
-    @SerializedName("prefill_tps") val prefillTps: Float = 0f,
-    @SerializedName("decode_tps") val decodeTps: Float = 0f,
-    @SerializedName("peak_ram_mb") val peakRamMb: Int = 0,
+    @SerializedName("confidence") val confidence: Double = 0.0,
+    @SerializedName("prefill_tps") val prefillTps: Double = 0.0,
+    @SerializedName("decode_tps") val decodeTps: Double = 0.0,
+    @SerializedName("peak_ram_mb") val peakRamMb: Double = 0.0,
     @SerializedName("validation") val validation: Validation? = null,
-    val rawJson: String = ""
+    val rawJson: String = "",
+    val parseError: String? = null
 ) {
     // Backward compatibility: use reason if reasoning is empty
     val effectiveReasoning: String
         get() = if (reasoning.isNotBlank()) reasoning else (reason ?: "")
+    
+    val confidenceFloat: Float = confidence.toFloat()
+    val prefillTpsFloat: Float = prefillTps.toFloat()
+    val decodeTpsFloat: Float = decodeTps.toFloat()
+    val peakRamMbInt: Int = peakRamMb.toInt()
 }
 
 data class FunctionCall(
@@ -409,7 +415,7 @@ class NeedleTestViewModel : ViewModel() {
         // Parse JSON response
         val parsed = parseNeedleResponse(result)
         phase.parsedResult = formatParsedResult(parsed)
-        phase.confidence = parsed.confidence
+        phase.confidence = parsed.confidenceFloat
 
         if (parsed.functionCalls.any { it.name == "device.flashlight_on" }) {
             phase.status = TestStatus.Pass("Tool call detected: device.flashlight_on")
@@ -445,7 +451,7 @@ class NeedleTestViewModel : ViewModel() {
 
         val parsed = parseNeedleResponse(result)
         phase.parsedResult = formatParsedResult(parsed)
-        phase.confidence = parsed.confidence
+        phase.confidence = parsed.confidenceFloat
 
         val hasToolCall = parsed.functionCalls.isNotEmpty()
         if (!hasToolCall || parsed.functionCalls.none { it.name == "device.flashlight_on" }) {
@@ -503,12 +509,13 @@ class NeedleTestViewModel : ViewModel() {
         recordPhaseResult(phase, if (phase.status is TestStatus.Pass) "PASS" else "FAIL", phase.rawJson)
     }
 
-    // Phase 6: Serialized Calls
+    // Phase 6: Serialized Calls / Stability
+    // Tests independent commands with clean state (reset between each call)
     private suspend fun runPhase6() {
         val phase = getPhase(6)
         phase.status = TestStatus.Running("Testing serialized calls...")
         updatePhase(phase.copy())
-        appendLog("Phase 6: Testing serialized calls / stability...")
+        appendLog("Phase 6: Testing independent calls with state reset...")
 
         val commands = listOf(
             "turn on the flashlight",
@@ -522,6 +529,12 @@ class NeedleTestViewModel : ViewModel() {
 
         for ((index, cmd) in commands.withIndex()) {
             appendLog("Test ${index + 1}: $cmd")
+            
+            // Reset needle to ensure clean state for each independent command
+            withContext(Dispatchers.IO) {
+                NeedleJNI.reset()
+            }
+            
             val result = withContext(Dispatchers.IO) {
                 NeedleJNI.complete(cmd, 512)
             }
@@ -539,10 +552,10 @@ class NeedleTestViewModel : ViewModel() {
         phase.inferenceTimeMs = 0
 
         if (allPassed) {
-            phase.status = TestStatus.Pass("All serialized calls passed")
+            phase.status = TestStatus.Pass("All independent calls passed (with reset)")
             phase.confidence = 1f
         } else {
-            phase.status = TestStatus.Fail(-1, "Some serialized calls failed", phase.rawJson)
+            phase.status = TestStatus.Fail(-1, "Some independent calls failed", phase.rawJson)
             phase.confidence = 0f
         }
         updatePhase(phase.copy())
@@ -577,8 +590,8 @@ class NeedleTestViewModel : ViewModel() {
                     output = result,
                     rawJson = result,
                     inferenceTimeMs = System.currentTimeMillis() - startTime,
-                    parsedResult = formatParsedResult(parseNeedleResponse(result)),
-                    confidence = parseNeedleResponse(result).confidence
+                    parsedResult = formatParsedResult(parsed),
+                    confidence = parsed.confidenceFloat
                 )
                 _customResult.value = phaseResult
                 addHistory(TestHistoryEntry(
@@ -586,7 +599,7 @@ class NeedleTestViewModel : ViewModel() {
                     command = input,
                     result = result,
                     rawJson = result,
-                    confidence = parseNeedleResponse(result).confidence,
+                    confidence = parsed.confidenceFloat,
                     status = if (result.startsWith("FAIL") || result.startsWith("Error")) "FAIL" else "PASS",
                     phase = "Custom"
                 ))
@@ -692,15 +705,23 @@ class NeedleTestViewModel : ViewModel() {
     }
 
     private fun parseNeedleResponse(json: String): NeedleResponse {
-        try {
-            return com.google.gson.Gson().fromJson(json, NeedleResponse::class.java)
+        return try {
+            com.google.gson.Gson().fromJson(json, NeedleResponse::class.java)
         } catch (e: Exception) {
-            return NeedleResponse(rawJson = json)
+            // Log the parsing error for diagnostics
+            val errorMsg = "JSON parse failed: ${e.message}\nJSON: $json"
+            appendLog(errorMsg)
+            NeedleResponse(rawJson = json, parseError = e.message)
         }
     }
 
     private fun formatParsedResult(response: NeedleResponse): String {
         val sb = StringBuilder()
+        if (response.parseError != null) {
+            sb.append("PARSE ERROR: ${response.parseError}\n")
+            sb.append("Raw JSON was preserved in rawJson field\n")
+            return sb.toString()
+        }
         sb.append("Type: ${response.type}\n")
         sb.append("Success: ${response.success}\n")
         if (response.error != null && response.error.isNotBlank()) sb.append("Error: ${response.error}\n")
@@ -714,10 +735,10 @@ class NeedleTestViewModel : ViewModel() {
             sb.append("Function Calls: (none)\n")
         }
         if (response.effectiveReasoning.isNotBlank()) sb.append("Reasoning: ${response.effectiveReasoning}\n")
-        sb.append("Confidence: ${response.confidence}\n")
-        if (response.prefillTps > 0) sb.append("Prefill TPS: ${response.prefillTps}\n")
-        if (response.decodeTps > 0) sb.append("Decode TPS: ${response.decodeTps}\n")
-        if (response.peakRamMb > 0) sb.append("Peak RAM: ${response.peakRamMb} MB\n")
+        sb.append("Confidence: ${response.confidenceFloat}\n")
+        if (response.prefillTpsFloat > 0) sb.append("Prefill TPS: ${response.prefillTpsFloat}\n")
+        if (response.decodeTpsFloat > 0) sb.append("Decode TPS: ${response.decodeTpsFloat}\n")
+        if (response.peakRamMbInt > 0) sb.append("Peak RAM: ${response.peakRamMbInt} MB\n")
         if (response.validation != null) {
             sb.append("Validation: ungrounded=${response.validation!!.ungrounded}, negation=${response.validation!!.negation}\n")
         }
