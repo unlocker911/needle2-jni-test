@@ -427,7 +427,7 @@ class NeedleTestViewModel : ViewModel() {
             phase.status = TestStatus.Fail(-1, "No tool call detected for flashlight", result)
         }
 
-        phase.confidence = max(phase.confidence, parsed.confidence)
+        phase.confidence = max(phase.confidence, parsed.confidenceFloat)
         updatePhase(phase.copy())
         recordPhaseResult(phase, if (phase.status is TestStatus.Pass) "PASS" else "FAIL", phase.rawJson)
     }
@@ -459,7 +459,7 @@ class NeedleTestViewModel : ViewModel() {
         } else {
             phase.status = TestStatus.Fail(-1, "Incorrectly triggered tool call", result)
         }
-        phase.confidence = max(phase.confidence, parsed.confidence)
+        phase.confidence = max(phase.confidence, parsed.confidenceFloat)
         updatePhase(phase.copy())
         recordPhaseResult(phase, if (phase.status is TestStatus.Pass) "PASS" else "FAIL", phase.rawJson)
     }
