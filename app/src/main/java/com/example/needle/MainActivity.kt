@@ -542,8 +542,8 @@ class NeedleTestViewModel : ViewModel() {
                 NeedleJNI.complete(cmd, 512)
             }
             val parsed = parseNeedleResponse(result)
-            appendLog("PHASE6_DIAG: parseError=${parsed.parseError} type=${parsed.typeNonNull} funcCallsSize=${parsed.functionCallsNonNull.size} firstCall=${parsed.functionCallsNonNull.firstOrNull()?.name} hasFlashlight=${parsed.functionCallsNonNull.any { it.name == \"device.flashlight_on\" }}")
             val hasFlashlight = parsed.functionCallsNonNull.any { it.name == "device.flashlight_on" }
+            appendLog("PHASE6_DIAG: parseError=${parsed.parseError} type=${parsed.typeNonNull} funcCallsSize=${parsed.functionCallsNonNull.size} firstCall=${parsed.functionCallsNonNull.firstOrNull()?.name} hasFlashlight=$hasFlashlight")
             val expected = cmd.contains("flashlight", ignoreCase = true)
             val passed = (expected && parsed.functionCallsNonNull.any { it.name == "device.flashlight_on" }) ||
                          (!expected && parsed.functionCallsNonNull.isEmpty())
