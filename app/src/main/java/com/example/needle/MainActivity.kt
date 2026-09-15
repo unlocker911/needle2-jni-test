@@ -127,18 +127,18 @@ data class TestHistoryEntry(
 )
 
 data class NeedleResponse(
-    @SerializedName("type") val type: String? = null,
-    @SerializedName("success") val success: Boolean = false,
-    @SerializedName("error") val error: String? = null,
-    @SerializedName("error_code") val errorCode: String? = null,
-    @SerializedName("function_calls") val functionCalls: List<FunctionCall>? = null,
-    @SerializedName("reason") val reason: String? = null,
-    @SerializedName("reasoning") val reasoning: String? = null,
-    @SerializedName("confidence") val confidence: Double = 0.0,
-    @SerializedName("prefill_tps") val prefillTps: Double = 0.0,
-    @SerializedName("decode_tps") val decodeTps: Double = 0.0,
-    @SerializedName("peak_ram_mb") val peakRamMb: Double = 0.0,
-    @SerializedName("validation") val validation: Validation? = null,
+    @field:SerializedName("type") val type: String? = null,
+    @field:SerializedName("success") val success: Boolean = false,
+    @field:SerializedName("error") val error: String? = null,
+    @field:SerializedName("error_code") val errorCode: String? = null,
+    @field:SerializedName("function_calls") val functionCalls: List<FunctionCall>? = null,
+    @field:SerializedName("reason") val reason: String? = null,
+    @field:SerializedName("reasoning") val reasoning: String? = null,
+    @field:SerializedName("confidence") val confidence: Double = 0.0,
+    @field:SerializedName("prefill_tps") val prefillTps: Double = 0.0,
+    @field:SerializedName("decode_tps") val decodeTps: Double = 0.0,
+    @field:SerializedName("peak_ram_mb") val peakRamMb: Double = 0.0,
+    @field:SerializedName("validation") val validation: Validation? = null,
     val rawJson: String = "",
     val parseError: String? = null
 ) {
@@ -156,13 +156,13 @@ data class NeedleResponse(
 }
 
 data class FunctionCall(
-    @SerializedName("name") val name: String = "",
-    @SerializedName("arguments") val arguments: Map<String, Any?> = emptyMap()
+    @field:SerializedName("name") val name: String = "",
+    @field:SerializedName("arguments") val arguments: Map<String, Any?> = emptyMap()
 )
 
 data class Validation(
-    @SerializedName("ungrounded") val ungrounded: List<String> = emptyList(),
-    @SerializedName("negation") val negation: Boolean = false
+    @field:SerializedName("ungrounded") val ungrounded: List<String> = emptyList(),
+    @field:SerializedName("negation") val negation: Boolean = false
 )
 
 data class ToolSchema(
