@@ -127,13 +127,13 @@ data class TestHistoryEntry(
 )
 
 data class NeedleResponse(
-    @SerializedName("type") val type: String = "",
+    @SerializedName("type") val type: String? = null,
     @SerializedName("success") val success: Boolean = false,
     @SerializedName("error") val error: String? = null,
     @SerializedName("error_code") val errorCode: String? = null,
-    @SerializedName("function_calls") val functionCalls: List<FunctionCall> = emptyList(),
+    @SerializedName("function_calls") val functionCalls: List<FunctionCall>? = null,
     @SerializedName("reason") val reason: String? = null,
-    @SerializedName("reasoning") val reasoning: String = "",
+    @SerializedName("reasoning") val reasoning: String? = null,
     @SerializedName("confidence") val confidence: Double = 0.0,
     @SerializedName("prefill_tps") val prefillTps: Double = 0.0,
     @SerializedName("decode_tps") val decodeTps: Double = 0.0,
@@ -142,9 +142,12 @@ data class NeedleResponse(
     val rawJson: String = "",
     val parseError: String? = null
 ) {
-    // Backward compatibility: use reason if reasoning is empty
+    // Backward compatibility: use reason if reasoning is empty/blank
     val effectiveReasoning: String
-        get() = if (reasoning.isNotBlank()) reasoning else (reason ?: "")
+        get() = if (reasoning?.isNotBlank() == true) reasoning!! else (reason ?: "")
+
+    val typeNonNull: String = type ?: ""
+    val functionCallsNonNull: List<FunctionCall> = functionCalls ?: emptyList()
     
     val confidenceFloat: Float = confidence.toFloat()
     val prefillTpsFloat: Float = prefillTps.toFloat()
@@ -417,7 +420,7 @@ class NeedleTestViewModel : ViewModel() {
         phase.parsedResult = formatParsedResult(parsed)
         phase.confidence = parsed.confidenceFloat
 
-        if (parsed.functionCalls.any { it.name == "device.flashlight_on" }) {
+        if (parsed.functionCallsNonNull.any { it.name == "device.flashlight_on" }) {
             phase.status = TestStatus.Pass("Tool call detected: device.flashlight_on")
             phase.confidence = max(phase.confidence, 0.9f)
         } else if (result.contains("device.flashlight_on") || result.contains("flashlight_on")) {
@@ -453,8 +456,8 @@ class NeedleTestViewModel : ViewModel() {
         phase.parsedResult = formatParsedResult(parsed)
         phase.confidence = parsed.confidenceFloat
 
-        val hasToolCall = parsed.functionCalls.isNotEmpty()
-        if (!hasToolCall || parsed.functionCalls.none { it.name == "device.flashlight_on" }) {
+        val hasToolCall = parsed.functionCallsNonNull.isNotEmpty()
+        if (!hasToolCall || parsed.functionCallsNonNull.none { it.name == "device.flashlight_on" }) {
             phase.status = TestStatus.Pass("No tool call (correctly declined)")
         } else {
             phase.status = TestStatus.Fail(-1, "Incorrectly triggered tool call", result)
@@ -500,7 +503,7 @@ class NeedleTestViewModel : ViewModel() {
             }
             phase.output += "\nAfter reset - Input: turn on the flashlight\nRaw Output:\n$result"
             val parsed = parseNeedleResponse(result)
-            val hasCall = parsed.functionCalls.any { it.name == "device.flashlight_on" }
+            val hasCall = parsed.functionCallsNonNull.any { it.name == "device.flashlight_on" }
             if (hasCall) {
                 phase.output += "\n✓ Tool call works after reset"
             }
@@ -539,10 +542,10 @@ class NeedleTestViewModel : ViewModel() {
                 NeedleJNI.complete(cmd, 512)
             }
             val parsed = parseNeedleResponse(result)
-            val hasFlashlight = parsed.functionCalls.any { it.name == "device.flashlight_on" }
+            val hasFlashlight = parsed.functionCallsNonNull.any { it.name == "device.flashlight_on" }
             val expected = cmd.contains("flashlight", ignoreCase = true)
-            val passed = (expected && parsed.functionCalls.any { it.name == "device.flashlight_on" }) ||
-                         (!expected && parsed.functionCalls.isEmpty())
+            val passed = (expected && parsed.functionCallsNonNull.any { it.name == "device.flashlight_on" }) ||
+                         (!expected && parsed.functionCallsNonNull.isEmpty())
             allPassed = allPassed && passed
             results.add("Cmd: $cmd\nExpected flashlight: $expected\nGot flashlight: $hasFlashlight\nPassed: $passed\nOutput: $result\n")
         }
@@ -722,13 +725,13 @@ class NeedleTestViewModel : ViewModel() {
             sb.append("Raw JSON was preserved in rawJson field\n")
             return sb.toString()
         }
-        sb.append("Type: ${response.type}\n")
+        sb.append("Type: ${response.typeNonNull}\n")
         sb.append("Success: ${response.success}\n")
         if (response.error != null && response.error.isNotBlank()) sb.append("Error: ${response.error}\n")
         if (response.errorCode != null && response.errorCode.isNotBlank()) sb.append("Error Code: ${response.errorCode}\n")
-        if (response.functionCalls.isNotEmpty()) {
+        if (response.functionCallsNonNull.isNotEmpty()) {
             sb.append("Function Calls:\n")
-            for (fc in response.functionCalls) {
+            for (fc in response.functionCallsNonNull) {
                 sb.append("  - ${fc.name}: ${fc.arguments}\n")
             }
         } else {
