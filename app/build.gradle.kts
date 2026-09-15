@@ -54,7 +54,7 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
-        freeCompilerArgs += "-parameters"
+        freeCompilerArgs += "-java-parameters"
     }
 
     compileOptions {
