@@ -411,6 +411,7 @@ class NeedleTestViewModel : ViewModel() {
         val result = withContext(Dispatchers.IO) {
             NeedleJNI.complete("turn on the flashlight", 512)
         }
+        appendLog("PHASE3_RAW_JSON: len=${result.length} preview=${result.take(200)}")
         phase.inferenceTimeMs = System.currentTimeMillis() - startTime
         phase.rawJson = result
         phase.output = result
@@ -541,6 +542,7 @@ class NeedleTestViewModel : ViewModel() {
             val result = withContext(Dispatchers.IO) {
                 NeedleJNI.complete(cmd, 512)
             }
+            appendLog("PHASE6_RAW_JSON: len=${result.length} preview=${result.take(200)}")
             val parsed = parseNeedleResponse(result)
             val hasFlashlight = parsed.functionCallsNonNull.any { it.name == "device.flashlight_on" }
             appendLog("PHASE6_DIAG: parseError=${parsed.parseError} type=${parsed.typeNonNull} funcCallsSize=${parsed.functionCallsNonNull.size} firstCall=${parsed.functionCallsNonNull.firstOrNull()?.name} hasFlashlight=$hasFlashlight")
@@ -585,6 +587,7 @@ class NeedleTestViewModel : ViewModel() {
                 val result = withContext(Dispatchers.IO) {
                     NeedleJNI.complete(input, 512)
                 }
+                appendLog("CUSTOM_RAW_JSON: len=${result.length} preview=${result.take(200)}")
                 val inferenceTime = System.currentTimeMillis() - startTime
                 val parsed = parseNeedleResponse(result)
 
@@ -709,6 +712,15 @@ class NeedleTestViewModel : ViewModel() {
     }
 
     private fun parseNeedleResponse(json: String): NeedleResponse {
+        // Diagnostic: test with known good JSON
+        val testJson = """{"type":"call","success":true,"function_calls":[{"name":"device.flashlight_on","arguments":{}}],"confidence":1.0}"""
+        val testParsed = try {
+            com.google.gson.Gson().fromJson(testJson, NeedleResponse::class.java)
+        } catch (e: Exception) {
+            NeedleResponse(rawJson = testJson, parseError = "TEST PARSE FAILED: ${e.message}")
+        }
+        appendLog("DIAG_TEST_JSON: type=${testParsed.typeNonNull} funcCalls=${testParsed.functionCallsNonNull.size} firstCall=${testParsed.functionCallsNonNull.firstOrNull()?.name} confidence=${testParsed.confidenceFloat} parseError=${testParsed.parseError}")
+
         return try {
             com.google.gson.Gson().fromJson(json, NeedleResponse::class.java)
         } catch (e: Exception) {
