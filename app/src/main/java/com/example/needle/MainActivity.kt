@@ -76,7 +76,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
-import com.google.gson.annotations.Transient
 import com.google.gson.reflect.TypeToken
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
@@ -139,10 +138,7 @@ data class NeedleResponse(
     @field:SerializedName("prefill_tps") val prefillTps: Double = 0.0,
     @field:SerializedName("decode_tps") val decodeTps: Double = 0.0,
     @field:SerializedName("peak_ram_mb") val peakRamMb: Double = 0.0,
-    @field:SerializedName("validation") val validation: Validation? = null,
-    // These fields are populated after parsing, not from JSON
-    @Transient val rawJson: String = "",
-    @Transient val parseError: String? = null
+    @field:SerializedName("validation") val validation: Validation? = null
 ) {
     // Backward compatibility: use reason if reasoning is empty/blank
     val effectiveReasoning: String
@@ -155,6 +151,10 @@ data class NeedleResponse(
     val prefillTpsFloat: Float = prefillTps.toFloat()
     val decodeTpsFloat: Float = decodeTps.toFloat()
     val peakRamMbInt: Int = peakRamMb.toInt()
+
+    // These fields are populated after parsing, not from JSON
+    var rawJson: String = ""
+    var parseError: String? = null
 }
 
 data class FunctionCall(
