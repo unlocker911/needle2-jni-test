@@ -166,7 +166,7 @@ data class NeedleResponse(
 
 data class FunctionCall(
     @field:SerializedName("name") val name: String = "",
-    @field:SerializedName("arguments") val arguments: Map<String, Any?> = emptyMap()
+    @field:SerializedName("arguments") val arguments: Map<String, *> = emptyMap()
 )
 
 data class Validation(
@@ -956,8 +956,8 @@ class NeedleTestViewModel : ViewModel() {
     }
 
     private fun parseNeedleResponse(json: String): NeedleResponse {
-        // Diagnostic: test with known good JSON
-        val testJson = """{"type":"call","success":true,"function_calls":[{"name":"device.flashlight_on","arguments":{}}],"confidence":1.0}"""
+        // Diagnostic: test with known good JSON matching actual Needle schema
+        val testJson = """{"type":"call","success":true,"error":null,"error_code":null,"reason":null,"function_calls":[{"name":"device.flashlight_on","arguments":{}}],"reasoning":null,"confidence":1.0,"prefill_tps":0.0,"decode_tps":0.0,"peak_ram_mb":0.0,"validation":{"ungrounded":[],"negation":false}}"""
         val testParsed = try {
             com.google.gson.Gson().fromJson(testJson, NeedleResponse::class.java)
         } catch (e: Exception) {
