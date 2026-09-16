@@ -166,7 +166,7 @@ data class NeedleResponse(
 
 data class FunctionCall(
     @field:SerializedName("name") val name: String = "",
-    @field:SerializedName("arguments") val arguments: Map<String, *> = emptyMap()
+    @field:SerializedName("arguments") val arguments: Map<String, Any> = emptyMap()
 )
 
 data class Validation(
