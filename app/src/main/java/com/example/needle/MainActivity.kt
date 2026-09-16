@@ -610,7 +610,8 @@ class NeedleTestViewModel : ViewModel() {
             }
             toolExecutionPassed = toolResult.success
             toolExecutionSummary = "Tool Execution: ${toolResult.name} — ${if (toolResult.success) "SUCCESS" else "FAILED"} — ${toolResult.error ?: toolResult.message}"
-            appendLog("TOOL_EXEC: name=${toolResult.name} result=${if (toolResult.success) "SUCCESS" else "FAILURE"} ${toolResult.error?.let { "error=$it" } ?? "message=${toolResult.message}"}")
+            val errorOrMessage = toolResult.error?.let { "error=$it" } ?: "message=${toolResult.message}"
+            appendLog("TOOL_EXEC: name=${toolResult.name} result=${if (toolResult.success) "SUCCESS" else "FAILURE"} $errorOrMessage")
             phase.output += "\n\n$toolExecutionSummary"
             phase.parsedResult += "\n\n$toolExecutionSummary"
         }
@@ -756,7 +757,8 @@ class NeedleTestViewModel : ViewModel() {
                         toolExecutor.execute(call, App.instance)
                     }
                     toolResults.add(toolResult)
-                    val toolLog = "TOOL_EXEC: name=${toolResult.name} result=${if (toolResult.success) "SUCCESS" else "FAILURE"} ${toolResult.error?.let { "error=$it" } ?? "message=${toolResult.message}"}"
+                    val errorOrMessage = toolResult.error?.let { "error=$it" } ?: "message=${toolResult.message}"
+                    val toolLog = "TOOL_EXEC: name=${toolResult.name} result=${if (toolResult.success) "SUCCESS" else "FAILURE"} $errorOrMessage"
                     appendLog(toolLog)
                     if (!toolResult.success) {
                         toolExecutionPassed = false
@@ -824,7 +826,8 @@ class NeedleTestViewModel : ViewModel() {
                             toolExecutor.execute(call, App.instance)
                         }
                         toolResults.add(toolResult)
-                        appendLog("TOOL_EXEC: name=${toolResult.name} result=${if (toolResult.success) "SUCCESS" else "FAILURE"} ${toolResult.error?.let { "error=$it" } ?? "message=${toolResult.message}"}")
+                        val errorOrMessage = toolResult.error?.let { "error=$it" } ?: "message=${toolResult.message}"
+                        appendLog("TOOL_EXEC: name=${toolResult.name} result=${if (toolResult.success) "SUCCESS" else "FAILURE"} $errorOrMessage")
                     }
                 }
 
