@@ -76,6 +76,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
+import com.google.gson.annotations.Transient
 import com.google.gson.reflect.TypeToken
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
@@ -139,8 +140,9 @@ data class NeedleResponse(
     @field:SerializedName("decode_tps") val decodeTps: Double = 0.0,
     @field:SerializedName("peak_ram_mb") val peakRamMb: Double = 0.0,
     @field:SerializedName("validation") val validation: Validation? = null,
-    val rawJson: String = "",
-    val parseError: String? = null
+    // These fields are populated after parsing, not from JSON
+    @Transient val rawJson: String = "",
+    @Transient val parseError: String? = null
 ) {
     // Backward compatibility: use reason if reasoning is empty/blank
     val effectiveReasoning: String
@@ -717,17 +719,26 @@ class NeedleTestViewModel : ViewModel() {
         val testParsed = try {
             com.google.gson.Gson().fromJson(testJson, NeedleResponse::class.java)
         } catch (e: Exception) {
-            NeedleResponse(rawJson = testJson, parseError = "TEST PARSE FAILED: ${e.message}")
+            val r = NeedleResponse()
+            r.rawJson = testJson
+            r.parseError = "TEST PARSE FAILED: ${e.message}"
+            r
         }
         appendLog("DIAG_TEST_JSON: type=${testParsed.typeNonNull} funcCalls=${testParsed.functionCallsNonNull.size} firstCall=${testParsed.functionCallsNonNull.firstOrNull()?.name} confidence=${testParsed.confidenceFloat} parseError=${testParsed.parseError}")
 
         return try {
-            com.google.gson.Gson().fromJson(json, NeedleResponse::class.java)
+            val parsed = com.google.gson.Gson().fromJson(json, NeedleResponse::class.java)
+            parsed.rawJson = json
+            parsed.parseError = null
+            parsed
         } catch (e: Exception) {
             // Log the parsing error for diagnostics
             val errorMsg = "JSON parse failed: ${e.message}\nJSON: $json"
             appendLog(errorMsg)
-            NeedleResponse(rawJson = json, parseError = e.message)
+            val r = NeedleResponse()
+            r.rawJson = json
+            r.parseError = e.message
+            r
         }
     }
 
