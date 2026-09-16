@@ -1,8 +1,15 @@
 package com.example.needle
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.hardware.camera2.CameraAccessException
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
+import android.os.Build
 import android.os.Bundle
+import androidx.core.content.ContextCompat
 import android.text.method.ScrollingMovementMethod
 import android.util.Log
 import android.view.View
@@ -179,6 +186,167 @@ data class NeedleInitParams(
     val toolIndexPath: String? = null
 )
 
+data class ToolResult(
+    val success: Boolean,
+    val name: String,
+    val message: String,
+    val error: String? = null
+) {
+    override fun toString(): String {
+        return if (success) "SUCCESS — $message" else "FAILED — ${error ?: message}"
+    }
+}
+
+interface ToolExecutor {
+    suspend fun execute(call: FunctionCall, context: Context): ToolResult
+    fun getSupportedTools(): Set<String>
+}
+
+class DefaultToolExecutor(private val context: Context) : ToolExecutor {
+    private val cameraManager by lazy { context.getSystemService(Context.CAMERA_SERVICE) as CameraManager }
+    private var flashlightCameraId: String? = null
+    private var hasFlashlight: Boolean = false
+
+    init {
+        initializeFlashlight()
+    }
+
+    private fun initializeFlashlight() {
+        try {
+            val cameraIds = cameraManager.cameraIdList
+            for (id in cameraIds) {
+                val characteristics = cameraManager.getCameraCharacteristics(id)
+                val facing = characteristics.get(CameraCharacteristics.LENS_FACING)
+                val flashAvailable = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE)
+
+                if (facing == CameraCharacteristics.LENS_FACING_BACK && flashAvailable == true) {
+                    flashlightCameraId = id
+                    hasFlashlight = true
+                    Log.i("ToolExecutor", "Found rear camera with flash: $id")
+                    break
+                }
+            }
+            if (!hasFlashlight) {
+                // Fallback: any camera with flash
+                for (id in cameraIds) {
+                    val characteristics = cameraManager.getCameraCharacteristics(id)
+                    val flashAvailable = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE)
+                    if (flashAvailable == true) {
+                        flashlightCameraId = id
+                        hasFlashlight = true
+                        Log.i("ToolExecutor", "Found camera with flash (fallback): $id")
+                        break
+                    }
+                }
+            }
+            if (!hasFlashlight) {
+                Log.w("ToolExecutor", "No camera with flash unit found")
+            }
+        } catch (e: CameraAccessException) {
+            Log.e("ToolExecutor", "Camera access error during initialization", e)
+            hasFlashlight = false
+        } catch (e: Exception) {
+            Log.e("ToolExecutor", "Unexpected error during flashlight initialization", e)
+            hasFlashlight = false
+        }
+    }
+
+    private suspend fun checkCameraPermission(): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val permission = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)
+            return permission == PackageManager.PERMISSION_GRANTED
+        }
+        return true // Permission granted by default on older versions
+    }
+
+    private suspend fun requestCameraPermission(): Boolean {
+        // This would require ActivityResultContracts.RequestPermission which needs Compose/Activity context
+        // For now, return false if not granted - the caller should handle permission request
+        return false
+    }
+
+    override suspend fun execute(call: FunctionCall, context: Context): ToolResult {
+        return when (call.name) {
+            "device.flashlight_on" -> executeFlashlightOn()
+            else -> ToolResult(
+                success = false,
+                name = call.name,
+                message = "Unknown tool",
+                error = "No executor registered for tool: ${call.name}"
+            )
+        }
+    }
+
+    private suspend fun executeFlashlightOn(): ToolResult {
+        // Check permission
+        val hasPermission = checkCameraPermission()
+        if (!hasPermission) {
+            return ToolResult(
+                success = false,
+                name = "device.flashlight_on",
+                message = "Camera permission not granted",
+                error = "CAMERA permission required for flashlight"
+            )
+        }
+
+        if (!hasFlashlight || flashlightCameraId == null) {
+            return ToolResult(
+                success = false,
+                name = "device.flashlight_on",
+                message = "No flashlight available",
+                error = "Device has no camera with flash unit"
+            )
+        }
+
+        val cameraId = flashlightCameraId!!
+        return try {
+            cameraManager.setTorchMode(cameraId, true)
+            Log.i("ToolExecutor", "Flashlight ON for camera: $cameraId")
+            ToolResult(
+                success = true,
+                name = "device.flashlight_on",
+                message = "Flashlight turned ON"
+            )
+        } catch (e: CameraAccessException) {
+            Log.e("ToolExecutor", "CameraAccessException turning on flashlight", e)
+            ToolResult(
+                success = false,
+                name = "device.flashlight_on",
+                message = "Camera access error",
+                error = "CameraAccessException: ${e.message}"
+            )
+        } catch (e: SecurityException) {
+            Log.e("ToolExecutor", "SecurityException turning on flashlight", e)
+            ToolResult(
+                success = false,
+                name = "device.flashlight_on",
+                message = "Permission denied",
+                error = "SecurityException: ${e.message}"
+            )
+        } catch (e: IllegalArgumentException) {
+            Log.e("ToolExecutor", "IllegalArgumentException turning on flashlight", e)
+            ToolResult(
+                success = false,
+                name = "device.flashlight_on",
+                message = "Invalid camera ID",
+                error = "IllegalArgumentException: ${e.message}"
+            )
+        } catch (e: Exception) {
+            Log.e("ToolExecutor", "Unexpected error turning on flashlight", e)
+            ToolResult(
+                success = false,
+                name = "device.flashlight_on",
+                message = "Flashlight error",
+                error = "${e.javaClass.simpleName}: ${e.message}"
+            )
+        }
+    }
+
+    override fun getSupportedTools(): Set<String> {
+        return setOf("device.flashlight_on")
+    }
+}
+
 enum class Screen {
     MAIN, CUSTOM_COMMAND, TOOLS, FULL_LOG
 }
@@ -229,6 +397,14 @@ class NeedleTestViewModel : ViewModel() {
 
     // Mutex for serializing Needle calls
     private val _mutex = kotlinx.coroutines.sync.Mutex()
+
+    // Tool Executor - initialized lazily when context is available
+    private var _toolExecutor: ToolExecutor? = null
+    fun setToolExecutor(context: Context) {
+        _toolExecutor = DefaultToolExecutor(context)
+    }
+    private val toolExecutor: ToolExecutor
+        get() = _toolExecutor ?: DefaultToolExecutor(App.instance)
 
     fun navigateTo(screen: Screen) {
         _currentScreen.value = screen
@@ -423,11 +599,31 @@ class NeedleTestViewModel : ViewModel() {
         phase.parsedResult = formatParsedResult(parsed)
         phase.confidence = parsed.confidenceFloat
 
-        if (parsed.functionCallsNonNull.any { it.name == "device.flashlight_on" }) {
-            phase.status = TestStatus.Pass("Tool call detected: device.flashlight_on")
-            phase.confidence = max(phase.confidence, 0.9f)
+        val hasFlashlightCall = parsed.functionCallsNonNull.any { it.name == "device.flashlight_on" }
+
+        // Execute function call through ToolExecutor if detected
+        var toolExecutionPassed = false
+        var toolExecutionSummary = ""
+        if (hasFlashlightCall) {
+            val toolResult = withContext(Dispatchers.IO) {
+                toolExecutor.execute(FunctionCall("device.flashlight_on", emptyMap()), App.instance)
+            }
+            toolExecutionPassed = toolResult.success
+            toolExecutionSummary = "Tool Execution: ${toolResult.name} — ${if (toolResult.success) "SUCCESS" else "FAILED"} — ${toolResult.error ?: toolResult.message}"
+            appendLog("TOOL_EXEC: name=${toolResult.name} result=${if (toolResult.success) "SUCCESS" else "FAILURE"} ${toolResult.error?.let { "error=$it" } ?? "message=${toolResult.message}"}")
+            phase.output += "\n\n$toolExecutionSummary"
+            phase.parsedResult += "\n\n$toolExecutionSummary"
+        }
+
+        // Phase 3 now validates: 1) Needle generated function call, 2) Gson parsed it, 3) ToolExecutor executed successfully
+        if (hasFlashlightCall && toolExecutionPassed) {
+            phase.status = TestStatus.Pass("Tool call detected AND executed: device.flashlight_on")
+            phase.confidence = max(phase.confidence, 0.95f)
+        } else if (hasFlashlightCall) {
+            phase.status = TestStatus.Fail(-1, "Tool call detected but execution failed: $toolExecutionSummary", result)
+            phase.confidence = max(phase.confidence, 0.5f)
         } else if (result.contains("device.flashlight_on") || result.contains("flashlight_on")) {
-            phase.status = TestStatus.Pass("Flashlight reference found in response")
+            phase.status = TestStatus.Pass("Flashlight reference found in response (unparsed)")
             phase.confidence = max(phase.confidence, 0.7f)
         } else {
             phase.status = TestStatus.Fail(-1, "No tool call detected for flashlight", result)
@@ -546,13 +742,40 @@ class NeedleTestViewModel : ViewModel() {
             }
             appendLog("PHASE6_RAW_JSON: len=${result.length} preview=${result.take(200)}")
             val parsed = parseNeedleResponse(result)
-            val hasFlashlight = parsed.functionCallsNonNull.any { it.name == "device.flashlight_on" }
-            appendLog("PHASE6_DIAG: parseError=${parsed.parseError} type=${parsed.typeNonNull} funcCallsSize=${parsed.functionCallsNonNull.size} firstCall=${parsed.functionCallsNonNull.firstOrNull()?.name} hasFlashlight=$hasFlashlight")
+            val hasFlashlightCall = parsed.functionCallsNonNull.any { it.name == "device.flashlight_on" }
+            appendLog("PHASE6_DIAG: parseError=${parsed.parseError} type=${parsed.typeNonNull} funcCallsSize=${parsed.functionCallsNonNull.size} firstCall=${parsed.functionCallsNonNull.firstOrNull()?.name} hasFlashlightCall=$hasFlashlightCall")
+
+            // Execute function calls through ToolExecutor
+            val toolResults = mutableListOf<ToolResult>()
+            var toolExecutionPassed = true
+            var toolExecutionSummary = ""
+
+            if (parsed.functionCallsNonNull.isNotEmpty()) {
+                for (call in parsed.functionCallsNonNull) {
+                    val toolResult = withContext(Dispatchers.IO) {
+                        toolExecutor.execute(call, App.instance)
+                    }
+                    toolResults.add(toolResult)
+                    val toolLog = "TOOL_EXEC: name=${toolResult.name} result=${if (toolResult.success) "SUCCESS" else "FAILURE"} ${toolResult.error?.let { "error=$it" } ?? "message=${toolResult.message}"}"
+                    appendLog(toolLog)
+                    if (!toolResult.success) {
+                        toolExecutionPassed = false
+                    }
+                }
+                toolExecutionSummary = toolResults.joinToString("\n") { "  ${it.name}: ${if (it.success) "SUCCESS" else "FAILED"} — ${it.error ?: it.message}" }
+            } else {
+                toolExecutionSummary = "No tool calls"
+            }
+
             val expected = cmd.contains("flashlight", ignoreCase = true)
-            val passed = (expected && parsed.functionCallsNonNull.any { it.name == "device.flashlight_on" }) ||
-                         (!expected && parsed.functionCallsNonNull.isEmpty())
+            // Phase 6 now validates: 1) Needle generated function call, 2) Gson parsed it, 3) ToolExecutor executed successfully
+            val needleCallCorrect = (expected && hasFlashlightCall) || (!expected && parsed.functionCallsNonNull.isEmpty())
+            val toolExecutionCorrect = if (expected) toolExecutionPassed else true // Only validate execution when flashlight expected
+            val passed = needleCallCorrect && toolExecutionCorrect
             allPassed = allPassed && passed
-            results.add("Cmd: $cmd\nExpected flashlight: $expected\nGot flashlight: $hasFlashlight\nPassed: $passed\nOutput: $result\n")
+
+            val toolExecStatus = if (parsed.functionCallsNonNull.isEmpty()) "N/A" else if (toolExecutionPassed) "SUCCESS" else "FAILED"
+            results.add("Cmd: $cmd\nExpected flashlight: $expected\nNeedle call correct: $needleCallCorrect\nTool execution: $toolExecStatus\nPassed: $passed\nOutput: $result\nTool Results:\n$toolExecutionSummary\n")
         }
 
         phase.rawJson = results.joinToString("\n---\n")
@@ -560,10 +783,10 @@ class NeedleTestViewModel : ViewModel() {
         phase.inferenceTimeMs = 0
 
         if (allPassed) {
-            phase.status = TestStatus.Pass("All independent calls passed (with reset)")
+            phase.status = TestStatus.Pass("All independent calls passed (with reset) — including tool execution")
             phase.confidence = 1f
         } else {
-            phase.status = TestStatus.Fail(-1, "Some independent calls failed", phase.rawJson)
+            phase.status = TestStatus.Fail(-1, "Some independent calls failed (needle or tool execution)", phase.rawJson)
             phase.confidence = 0f
         }
         updatePhase(phase.copy())
@@ -593,23 +816,39 @@ class NeedleTestViewModel : ViewModel() {
                 val inferenceTime = System.currentTimeMillis() - startTime
                 val parsed = parseNeedleResponse(result)
 
+                // Execute function calls through ToolExecutor
+                val toolResults = mutableListOf<ToolResult>()
+                if (parsed.functionCallsNonNull.isNotEmpty()) {
+                    for (call in parsed.functionCallsNonNull) {
+                        val toolResult = withContext(Dispatchers.IO) {
+                            toolExecutor.execute(call, App.instance)
+                        }
+                        toolResults.add(toolResult)
+                        appendLog("TOOL_EXEC: name=${toolResult.name} result=${if (toolResult.success) "SUCCESS" else "FAILURE"} ${toolResult.error?.let { "error=$it" } ?? "message=${toolResult.message}"}")
+                    }
+                }
+
+                val allToolsSucceeded = toolResults.all { it.success }
+                val toolExecutionSummary = if (toolResults.isEmpty()) "No tool calls" else toolResults.joinToString("\n") { "  ${it.name}: ${if (it.success) "SUCCESS" else "FAILED"} — ${it.error ?: it.message}" }
+
                 val phaseResult = phase.copy(
                     status = if (result.startsWith("FAIL") || result.startsWith("Error")) TestStatus.Fail(-1, "Command failed", result)
+                        else if (toolResults.isNotEmpty() && !allToolsSucceeded) TestStatus.Fail(-1, "Tool execution failed", toolExecutionSummary)
                         else TestStatus.Pass("Command completed"),
-                    output = result,
+                    output = result + if (toolResults.isNotEmpty()) "\n\nTool Execution:\n$toolExecutionSummary" else "",
                     rawJson = result,
                     inferenceTimeMs = System.currentTimeMillis() - startTime,
-                    parsedResult = formatParsedResult(parsed),
+                    parsedResult = formatParsedResult(parsed) + if (toolResults.isNotEmpty()) "\n\nTool Execution Results:\n$toolExecutionSummary" else "",
                     confidence = parsed.confidenceFloat
                 )
                 _customResult.value = phaseResult
                 addHistory(TestHistoryEntry(
                     timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()),
                     command = input,
-                    result = result,
+                    result = phaseResult.output,
                     rawJson = result,
                     confidence = parsed.confidenceFloat,
-                    status = if (result.startsWith("FAIL") || result.startsWith("Error")) "FAIL" else "PASS",
+                    status = if (result.startsWith("FAIL") || result.startsWith("Error") || (toolResults.isNotEmpty() && !allToolsSucceeded)) "FAIL" else "PASS",
                     phase = "Custom"
                 ))
             } catch (e: Exception) {
@@ -826,6 +1065,11 @@ fun MainScreen(viewModel: NeedleTestViewModel) {
     val modelLoaded by viewModel.modelLoaded.collectAsState()
     val needleInitialized by viewModel.needleInitialized.collectAsState()
     val needleLoaded by viewModel.needleLoaded.collectAsState()
+
+    // Initialize ToolExecutor with context
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        viewModel.setToolExecutor(context)
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         when (currentScreen) {
