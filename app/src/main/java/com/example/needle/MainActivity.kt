@@ -955,26 +955,67 @@ class NeedleTestViewModel : ViewModel() {
         App.instance.startActivity(Intent.createChooser(intent, "Share Results"))
     }
 
-    private fun parseNeedleResponse(json: String): NeedleResponse {
-        // Diagnostic: test with known good JSON matching actual Needle schema
-        val testJson = """{"type":"call","success":true,"error":null,"error_code":null,"reason":null,"function_calls":[{"name":"device.flashlight_on","arguments":{}}],"reasoning":null,"confidence":1.0,"prefill_tps":0.0,"decode_tps":0.0,"peak_ram_mb":0.0,"validation":{"ungrounded":[],"negation":false}}"""
-        val testParsed = try {
-            com.google.gson.Gson().fromJson(testJson, NeedleResponse::class.java)
-        } catch (e: Exception) {
-            val r = NeedleResponse()
-            r.rawJson = testJson
-            r.parseError = "TEST PARSE FAILED: ${e.message}"
-            r
+    private fun parseFunctionCalls(arr: org.json.JSONArray?): List<FunctionCall> {
+        if (arr == null) return emptyList()
+        return (0 until arr.length()).mapNotNull { i ->
+            val obj = arr.optJSONObject(i) ?: return@mapNotNull null
+            val name = obj.optString("name", "")
+            val argsObj = obj.optJSONObject("arguments")
+            val args = if (argsObj != null) {
+                argsObj.keys().asSequence().associateWith { key -> argsObj.get(key) }
+            } else emptyMap()
+            FunctionCall(name = name, arguments = args)
         }
-        appendLog("DIAG_TEST_JSON: type=${testParsed.typeNonNull} funcCalls=${testParsed.functionCallsNonNull.size} firstCall=${testParsed.functionCallsNonNull.firstOrNull()?.name} confidence=${testParsed.confidenceFloat} parseError=${testParsed.parseError}")
+    }
 
+    private fun parseValidation(obj: org.json.JSONObject?): Validation? {
+        if (obj == null) return null
+        val ungroundedArr = obj.optJSONArray("ungrounded")
+        val ungrounded = if (ungroundedArr != null) {
+            (0 until ungroundedArr.length()).mapNotNull { ungroundedArr.optString(it) }
+        } else emptyList()
+        return Validation(ungrounded = ungrounded, negation = obj.optBoolean("negation", false))
+    }
+
+    private fun parseNeedleResponse(json: String): NeedleResponse {
+        // Diagnostic: test Gson vs JSONObject with known good JSON
+        val testJson = """{"type":"call","success":true,"error":null,"error_code":null,"reason":null,"function_calls":[{"name":"device.flashlight_on","arguments":{}}],"reasoning":null,"confidence":1.0,"prefill_tps":0.0,"decode_tps":0.0,"peak_ram_mb":0.0,"validation":{"ungrounded":[],"negation":false}}"""
+        val gsonParsed = try {
+            com.google.gson.Gson().fromJson(testJson, NeedleResponse::class.java)
+        } catch (e: Exception) { null }
+        val gsonType = gsonParsed?.type ?: "EXCEPTION"
+        val gsonFuncCount = gsonParsed?.functionCalls?.size ?: -1
+        val gsonConf = gsonParsed?.confidence ?: -1.0
+
+        val orgObj = try { org.json.JSONObject(testJson) } catch (e: Exception) { null }
+        val orgType = orgObj?.optString("type", "MISSING") ?: "EXCEPTION"
+        val orgFuncCount = orgObj?.optJSONArray("function_calls")?.length() ?: -1
+        val orgConf = orgObj?.optDouble("confidence", -1.0) ?: -1.0
+
+        appendLog("DIAG_GSON: type=$gsonType funcCalls=$gsonFuncCount confidence=$gsonConf")
+        appendLog("DIAG_ORGJSON: type=$orgType funcCalls=$orgFuncCount confidence=$orgConf")
+
+        // Use org.json.JSONObject (built into Android) — no reflection needed
         return try {
-            val parsed = com.google.gson.Gson().fromJson(json, NeedleResponse::class.java)
-            parsed.rawJson = json
-            parsed.parseError = null
-            parsed
+            val obj = org.json.JSONObject(json)
+            NeedleResponse(
+                type = if (obj.isNull("type")) null else obj.getString("type"),
+                success = obj.optBoolean("success", false),
+                error = if (obj.isNull("error")) null else obj.getString("error"),
+                errorCode = if (obj.isNull("error_code")) null else obj.getString("error_code"),
+                functionCalls = parseFunctionCalls(obj.optJSONArray("function_calls")),
+                reason = if (obj.isNull("reason")) null else obj.getString("reason"),
+                reasoning = if (obj.isNull("reasoning")) null else obj.getString("reasoning"),
+                confidence = obj.optDouble("confidence", 0.0),
+                prefillTps = obj.optDouble("prefill_tps", 0.0),
+                decodeTps = obj.optDouble("decode_tps", 0.0),
+                peakRamMb = obj.optDouble("peak_ram_mb", 0.0),
+                validation = parseValidation(obj.optJSONObject("validation"))
+            ).also {
+                it.rawJson = json
+                it.parseError = null
+            }
         } catch (e: Exception) {
-            // Log the parsing error for diagnostics
             val errorMsg = "JSON parse failed: ${e.message}\nJSON: $json"
             appendLog(errorMsg)
             val r = NeedleResponse()
